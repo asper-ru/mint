@@ -1,36 +1,58 @@
+set -v
+set -e
 
 
-DISK=sdb   # nvme0n1 
-PART1=sdb1 # nvme0n1p1
-PART2=sdb2 # nvm0n1p2
+#DISK0=sdb
+#PART1=sdb1
+#PART2=sdb
 
-sudo parted -s /dev/$DISK mklabel gpt
-sudo parted -s /dev/$DISK mkpart ESP fat32 1MiB 1025MiB
+DISK0=nvme0n1 
+PART1=nvme0n1p1
+PART2=nvme0n1p2
+
+sudo parted -s /dev/$DISK0 mklabel gpt
+sleep 1
+sudo parted -s /dev/$DISK0 mkpart ESP fat32 1MiB 1025MiB
+sleep 1
 sudo mkfs.vfat -F32 /dev/$PART1
-sudo parted -s /dev/$DISK set 1 boot on
-sudo parted -s /dev/$DISK mkpart primary 1025MiB 100%
+sleep 1
+sudo parted -s /dev/$DISK0 set 1 boot on
+sleep 1
+sudo parted -s /dev/$DISK0 mkpart primary 1025MiB 100%
 
 sudo cryptsetup -v --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 5000 --use-random luksFormat --type luks2 /dev/$PART2
-sudo cryptsetup luksOpen /dev/$PART2 $PART2_crypt
+sleep 1
+sudo cryptsetup luksOpen /dev/$PART2 ${PART2}_crypt
+sleep 1
 
-sudo pvcreate /dev/mapper/$PART2_crypt
-sudo vgcreate mint /dev/mapper/$PART2_crypt
+sudo pvcreate /dev/mapper/${PART2}_crypt
+sleep 1
+sudo vgcreate mint /dev/mapper/${PART2}_crypt
+sleep 1
 sudo lvcreate -L 20G mint -n swap
+sleep 1
 sudo lvcreate -l +100%FREE mint -n root
 
 sh -c 'ubiquity -b gtk_ui'
 
 sudo mount /dev/mapper/mint-root /mnt
+sleep 1
 sudo mount --bind /dev /mnt/dev
+sleep 1
 sudo mount --bind /dev/pts /mnt/dev/pts
+sleep 1
 sudo mount --bind /sys /mnt/sys
+sleep 1
 sudo mount --bind /proc /mnt/proc
+sleep 1
 sudo mount --bind /run /mnt/run
+sleep 1
 sudo mount /dev/$PART1 /mnt/boot/efi
+sleep 1
 
 sudo chmod -R g-rwx,o-rwx /mnt/boot
 
-echo "$PART2_crypt UUID=$(sudo blkid -s UUID -o value /dev/$PART2) none luks"| sudo chroot /mnt tee -a /etc/crypttab
+echo "${PART2}_crypt UUID=$(sudo blkid -s UUID -o value /dev/${PART2}) none luks"| sudo chroot /mnt tee -a /etc/crypttab
 
 sudo chroot /mnt sed -i.bak 's/\/dev\/mapper\/mint-root/UUID='"$(sudo blkid -s UUID -o value /dev/mapper/mint-root)"'/' /etc/fstab
 sudo chroot /mnt locale-gen --purge --no-archive
@@ -45,7 +67,7 @@ sudo chroot /mnt objcopy --add-section .osrel=/etc/os-release --change-section-v
 
 sudo cp -f /mnt/boot/efistub/kernel.efi /mnt/boot/efi/EFI/Mint/kernel.efi
 sudo cp -f /mnt/boot/efistub/kernel.efi /mnt/boot/efi/EFI/Boot/Bootx64.efi
-sudo chroot /mnt efibootmgr -c -d /dev/$DISK -p 1 -D -L "Mint" -l "\EFI\Mint\kernel.efi"
+sudo chroot /mnt efibootmgr -c -d /dev/$DISK0 -p 1 -D -L "Mint" -l "\EFI\Mint\kernel.efi"
 
 sudo chroot /mnt mkdir -p /etc/initramfs/post-update.d
 
@@ -72,4 +94,4 @@ echo "sleep 10" | sudo chroot /mnt tee -a /etc/initramfs/post-update.d/objcopy_u
 sudo chroot /mnt chmod +x /etc/initramfs/post-update.d/objcopy_update_hook
 
 sudo umount /mnt/boot/efi /mnt/proc /mnt/dev/pts /mnt/dev /mnt/sys /mnt/run /mnt
-
+sleep 1
